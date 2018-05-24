@@ -7,13 +7,14 @@ import requests as req # request library
 from bs4 import BeautifulSoup # scraping library
 from urlparse import urlparse # parsing library
 import sys
-import pprint
+import json
 
 class Crawler(object):
 
     def __init__(self, url):
         self.url = url
         self.crawled = set()
+        self.sitemap = None
         self.parsed_url = urlparse(url)
         self.host = self.parsed_url.netloc
         if self.host.startswith('www.'):
@@ -47,12 +48,16 @@ class Crawler(object):
     def create_url(self, path):
         return "http://" + self.parsed_url.netloc + path
 
-    # TODO - do something about default param
-    def crawl(self, url=sys.argv[1], parent="/", site_part={}):
-        # print "\ncrawling "+url # debug
+    def scrape(self, url):
         markup = req.get(url).text
         soup = BeautifulSoup(markup, 'lxml')
         links = [a["href"] for a in soup.find_all("a", href=self.of_same_domain)] # extracting links
+        return links
+    
+    # TODO - do something about default param
+    def crawlDFS(self, url=sys.argv[1], parent="/", site_part={}):
+        # print "\ncrawling "+url # debug
+        links = self.scrape(url)
         for l in links:
             # print "raw href: " + l # debug
             if l[0] == "/":
@@ -60,21 +65,41 @@ class Crawler(object):
             # print l, parent, url # debug
             if l == parent or l == url:
                 continue
-            # if l not in site_part and l not in self.crawled:
-            #     site_part[l] = {}
             if l not in self.crawled:
                 site_part[l] = {}
                 self.crawled.add(l)
-                self.crawl(l, url, site_part[l])
+                self.crawlDFS(l, url, site_part[l])
         self.sitemap = site_part
+    
+    # TODO - Breadth first search function
+    def crawlBFS(self, url=sys.argv[1]):
+        # self.sitemap = {}
+        queue = []
+        # depth_queue = []
+        queue.append(url)
+        # depth_queue.append(0)
+        while queue:
+            l = queue.pop(0)
+            # d = depth_queue.pop(0)
+            if l == url: # same link
+                continue
+            if l[0] == "/":
+                l = self.create_url(l)
+            # site_part[l] = {}
+            # for i in range(d):
+            #     site_part = self.sitemap[l]
+            for link in self.scrape(l):
+                if link not in self.crawled:
+                    queue.append(link)
+                    self.crawled.add(link)
 
     def display_sitemap(self):
-        pprint.pprint(self.sitemap)
+        print json.dumps(self.sitemap, indent=2)
 
 
 def main():
     crawler = Crawler(sys.argv[1])
-    crawler.crawl()
+    crawler.crawlDFS()
     crawler.display_sitemap()
 
 if __name__ == "__main__":
