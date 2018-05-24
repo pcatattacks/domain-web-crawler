@@ -7,13 +7,13 @@ import requests as req # request library
 from bs4 import BeautifulSoup # scraping library
 from urlparse import urlparse # parsing library
 import sys
-import re # regex library
+import pprint
 
 class Crawler(object):
 
     def __init__(self, url):
-        self.sitemap = {}
         self.url = url
+        self.crawled = set()
         self.parsed_url = urlparse(url)
         self.host = self.parsed_url.netloc
         if self.host.startswith('www.'):
@@ -45,25 +45,37 @@ class Crawler(object):
         return True
 
     def create_url(self, path):
-        return self.parsed_url.netloc + path
+        return "http://" + self.parsed_url.netloc + path
 
-    def crawl(self, url=self.url):
+    # TODO - do something about default param
+    def crawl(self, url=sys.argv[1], parent="/", site_part={}):
+        # print "\ncrawling "+url # debug
         markup = req.get(url).text
         soup = BeautifulSoup(markup, 'lxml')
         links = [a["href"] for a in soup.find_all("a", href=self.of_same_domain)] # extracting links
-        # for l in links:
-        #     if l not in self.sitemap:
+        for l in links:
+            # print "raw href: " + l # debug
+            if l[0] == "/":
+                l = self.create_url(l)
+            # print l, parent, url # debug
+            if l == parent or l == url:
+                continue
+            # if l not in site_part and l not in self.crawled:
+            #     site_part[l] = {}
+            if l not in self.crawled:
+                site_part[l] = {}
+                self.crawled.add(l)
+                self.crawl(l, url, site_part[l])
+        self.sitemap = site_part
 
-        #     if l[0] == "/": # so a path, not complete link
-        #         self.crawl()
-
-    def sitemap(self):
-        pass
+    def display_sitemap(self):
+        pprint.pprint(self.sitemap)
 
 
 def main():
     crawler = Crawler(sys.argv[1])
     crawler.crawl()
+    crawler.display_sitemap()
 
 if __name__ == "__main__":
     main()
