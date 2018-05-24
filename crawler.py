@@ -11,21 +11,24 @@ import json
 
 class Crawler(object):
 
-    def __init__(self, url):
+    def __init__(self, url, verbose=False):
+        self.verbose = verbose
         self.url = url
         self.crawled = set()
-        self.sitemap = None
+        self.sitemap = {}
         self.parsed_url = urlparse(url)
         self.host = self.parsed_url.netloc
         if self.host.startswith('www.'):
             self.host = self.host[4:] # removing www.
             print self.host
         if not self.is_valid_domain():
-            print >> sys.exit(1), "Typed an invalid domain."
+            print >> sys.stderr, "Domain must start with http:// or https://."
+            sys.exit(1)
 
     def is_valid_domain(self):
-        # TODO
         # test whether http:// provided etc, test whether is subdomain or domain
+        if not self.url.startswith("http://") and not self.url.startswith("https://"):
+            return False
         return True
 
     def of_same_domain(self, href):
@@ -46,21 +49,37 @@ class Crawler(object):
         return True
 
     def create_url(self, path):
-        return "http://" + self.parsed_url.netloc + path
+        if path.startswith("./"): # starts with ./
+            return "http://" + self.parsed_url.netloc + path[1:]
+        elif path[0] == "/":
+            return "http://" + self.parsed_url.netloc + path
+        elif path.startswith("www."):
+            return "http://" + path
+        else: # looks like blah/blah
+            return "http://" + self.parsed_url.netloc + "/"+path
 
     def scrape(self, url):
-        markup = req.get(url).text
+        # making sure that an error on the server's end doesn't stop the crawling
+        try:
+            res = req.get(url)
+            markup = res.text
+        except:
+            return []
+        if not res.headers["content-type"].startswith("text/html") and not res.headers["content-type"].startswith("text/xml"): # making sure only html is crawled
+            if self.verbose:
+                print "Non HTML content"
+            return []
         soup = BeautifulSoup(markup, 'lxml')
         links = [a["href"] for a in soup.find_all("a", href=self.of_same_domain)] # extracting links
         return links
     
-    # TODO - do something about default param
-    def crawlDFS(self, url=sys.argv[1], parent="/", site_part={}):
-        # print "\ncrawling "+url # debug
+    def crawlDFShelper(self, url=None, parent="/", site_part={}):
+        if self.verbose:
+            print "Crawling "+url + '\n'
         links = self.scrape(url)
         for l in links:
             # print "raw href: " + l # debug
-            if l[0] == "/":
+            if not l.startswith("http"):
                 l = self.create_url(l)
             # print l, parent, url # debug
             if l == parent or l == url:
@@ -68,39 +87,52 @@ class Crawler(object):
             if l not in self.crawled:
                 site_part[l] = {}
                 self.crawled.add(l)
-                self.crawlDFS(l, url, site_part[l])
-        self.sitemap = site_part
+                self.crawlDFShelper(l, url, site_part[l])
+        return site_part
+
+    def crawlDFS(self):
+        self.sitemap = self.crawlDFShelper(self.url)
     
-    # TODO - Breadth first search function
-    def crawlBFS(self, url=sys.argv[1]):
-        # self.sitemap = {}
+    def crawlBFS(self):
         queue = []
-        # depth_queue = []
-        queue.append(url)
-        # depth_queue.append(0)
+        queue.append( (self.url, self.sitemap) )
         while queue:
-            l = queue.pop(0)
-            # d = depth_queue.pop(0)
-            if l == url: # same link
-                continue
-            if l[0] == "/":
+            l, site_map = queue.pop(0)
+            if self.verbose:
+                print "Crawling "+ l + '\n'
+            if not l.startswith("http"):
                 l = self.create_url(l)
-            # site_part[l] = {}
-            # for i in range(d):
-            #     site_part = self.sitemap[l]
+            site_map[l] = {}
             for link in self.scrape(l):
                 if link not in self.crawled:
-                    queue.append(link)
+                    queue.append( (link, site_map[l]) )
                     self.crawled.add(link)
 
     def display_sitemap(self):
-        print json.dumps(self.sitemap, indent=2)
+        print json.dumps(self.sitemap, indent=4)
 
 
 def main():
-    crawler = Crawler(sys.argv[1])
-    crawler.crawlDFS()
+    
+    if "verbose" in sys.argv:
+        crawler = Crawler(sys.argv[1], True)
+    else:
+        crawler = Crawler(sys.argv[1])
+
+    err = False
+    try:
+        if "dfs" in sys.argv:
+            crawler.crawlDFS() # DEPTH FIRST SEARCH CRAWL
+        else:
+            crawler.crawlBFS() # BREADTH FIRST SEARCH CRAWL - Outputs a correctly structured sitemap.
+    except:
+        err = True
+        print >> sys.stderr, "An unknown error occured.\n"
+    # if some unknown error occurs, at least whats already been crawled will be printed
     crawler.display_sitemap()
+    if err:
+        sys.exit(1)
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
