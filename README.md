@@ -1,8 +1,11 @@
 ## Setup
 
 ```
+pip install virtualenv # I recommend using a virtualenv to prevent installing dependencies globally.
+virtualenv venv
 source venv/bin/activate
-pip install -r requirements.txt # redundant, but may as well do it anyway.
+
+pip install -r requirements.txt # Skip to this if you don't want to use virtualenv.
 ```
 
 ## Usage
