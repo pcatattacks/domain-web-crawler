@@ -1,7 +1,8 @@
 ## Setup
 
 ```
-pip install -r requirements.txt
+source venv/bin/activate
+pip install -r requirements.txt # redundant, but may as well do it anyway.
 ```
 
 ## Usage
@@ -47,3 +48,18 @@ The output is in json format, so it's best if you put it in a json file. Or not.
 ```
 python crawler.py https://pranavdhingra.me > myfile
 ```
+
+## Testing
+
+```
+python crawler.test.py
+```
+
+Please refer to comments in test file. The testing isn't extensive, but I did what I could with limited time. I can explain more about how to go about it during our discussion!
+
+## When you're finished:
+
+```
+$ deactivate
+```
+to deactivate the virtualenv. Have a good day!

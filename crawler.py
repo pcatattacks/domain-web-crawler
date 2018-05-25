@@ -73,25 +73,22 @@ class Crawler(object):
         links = [a["href"] for a in soup.find_all("a", href=self.of_same_domain)] # extracting links
         return links
     
-    def crawlDFShelper(self, url=None, parent="/", site_part={}):
+    def crawlDFShelper(self, url=None, site_part={}):
         if self.verbose:
             print "Crawling "+url + '\n'
         links = self.scrape(url)
         for l in links:
-            # print "raw href: " + l # debug
             if not l.startswith("http"):
                 l = self.create_url(l)
-            # print l, parent, url # debug
-            if l == parent or l == url:
-                continue
             if l not in self.crawled:
                 site_part[l] = {}
                 self.crawled.add(l)
-                self.crawlDFShelper(l, url, site_part[l])
+                self.crawlDFShelper(l, site_part[l])
         return site_part
 
     def crawlDFS(self):
-        self.sitemap = self.crawlDFShelper(self.url)
+        self.crawled.add(self.url)
+        self.sitemap = { self.url: self.crawlDFShelper(self.url) }
     
     def crawlBFS(self):
         queue = []
@@ -118,7 +115,7 @@ def main():
         crawler = Crawler(sys.argv[1], True)
     else:
         crawler = Crawler(sys.argv[1])
-
+    
     err = False
     try:
         if "dfs" in sys.argv:
